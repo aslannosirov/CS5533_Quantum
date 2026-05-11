@@ -1,95 +1,68 @@
-# Key Lifecycle — Q-Delegate
+# Q-Delegate (Submission Build)
 
-## 1. Overview
+A secure delegated quantum-job prototype with:
+- authenticated request envelopes,
+- replay protection,
+- circuit schema validation,
+- a local state-vector execution backend,
+- named algorithm mode,
+- and automated tests.
 
-This document defines how cryptographic keys are generated, stored, used, rotated, and revoked within the Q-Delegate protocol. Proper key management is critical to maintaining system security.
+## Features
 
----
+- **Protocol security**: HMAC request signing, spec-version enforcement, nonce + job-id replay prevention, timestamp freshness checks.
+- **Validation**: strict payload checks (`n_qubits`, gate tuple shape, ranges, shot limits).
+- **Quantum execution**: gates `H/X/Y/Z/S/T/RX/RZ/CNOT` with probabilities and optional shot sampling.
+- **Algorithms**: `bell`, `ghz`, `deutsch_jozsa_small` (via payload algorithm mode).
 
-## 2. Key Types
+## Quickstart
 
-| Key Type | Purpose |
-|----------|--------|
-| Master Key | Root secret used for deriving session keys |
-| Session Key | Used for AEAD encryption (AES-GCM) |
-| Server Signing Key | Used to sign responses (Ed25519) |
+```bash
+python -m pytest -q
+python demo.py
+```
 
----
+## Request modes
 
-## 3. Key Generation
+### Raw-circuit mode
+```python
+payload = {
+  "n_qubits": 2,
+  "gates": [("H", 0), ("CNOT", 0, 1)],
+  "shots": 1024,
+}
+```
 
-- Master key is generated using a secure random number generator
-- Session keys are derived using HKDF-SHA256 from the master key
-- Signing key pair (Ed25519) is generated once for the server
+### Named-algorithm mode
+```python
+payload = {
+  "algorithm": "ghz",
+  "params": {"n_qubits": 3}
+}
+```
 
----
+## Security model summary
 
-## 4. Key Storage
+Server rejects requests for:
+- missing required fields,
+- unsupported protocol version,
+- stale timestamps,
+- duplicate `job_id`,
+- reused `nonce`,
+- invalid auth tags,
+- malformed/unsafe payloads.
 
-- Keys are never stored in source code
-- Local development uses environment variables (`.env`)
-- Server signing key is stored securely and not exposed
-- Session keys exist only in memory during execution
+## Project structure
 
----
-
-## 5. Key Usage
-
-- Session keys are used only for AEAD encryption/decryption
-- Signing keys are used only for generating/verifying signatures
-- Keys are not reused across different purposes
-
----
-
-## 6. Key Rotation
-
-- Session keys are rotated per job or session
-- Each job uses a fresh derived key
-- Master key is not rotated in the MVP but is documented for future improvement
-
----
-
-## 7. Key Revocation
-
-If a key is suspected to be compromised:
-
-1. Mark the associated key context as revoked
-2. Reject all requests using that key
-3. Generate new session keys
-4. Log the event for auditing
-5. Restart affected sessions
-
----
-
-## 8. Compromise Handling
-
-In the event of compromise:
-
-- All active sessions are invalidated
-- New keys are derived
-- Old keys are no longer accepted
-- System logs the incident
-
----
-
-## 9. Security Requirements
-
-- Keys shall be generated using secure randomness
-- Keys shall never be logged or exposed
-- Keys shall be separated by purpose
-- Session keys shall be short-lived
-- Compromised keys shall be revoked immediately
-
----
-
-## 10. Summary
-
-The Q-Delegate system enforces:
-
-- Secure key generation
-- Safe key storage practices
-- Controlled key usage
-- Session-based key rotation
-- Defined compromise response procedures
-
-This ensures that cryptographic keys remain protected throughout their lifecycle.
+```text
+src/
+  client.py
+  protocol.py
+  server.py
+  quantum_sim.py
+  algorithms.py
+tests/
+  test_server.py
+demo.py
+pytest.ini
+```
